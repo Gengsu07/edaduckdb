@@ -1,0 +1,17 @@
+version: "3.8"
+
+services:
+  rekeningcrapetools:
+    build:
+      context: .
+    volumes:
+      # Only sync the source code
+      - ./app.py:/app/app.py
+      - ./src/pages/:/app/pages
+      - ./src/parser/:/app/parser
+      - ./src/sampel/:/app/sampel
+      - ./pyproject.toml:/app/pyproject.toml
+      # Prevent the .venv from being mounted
+      - /app/.venv
+    ports:
+      - "8501:8501"
