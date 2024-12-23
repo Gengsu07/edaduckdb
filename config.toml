@@ -1,0 +1,7 @@
+[db]
+db_flavour = "POSTGRES"
+host = "10.20.254.226"
+port = 5432
+user = "gengsu07"
+password = "Gengsu!sh3r3"
+database = "ppmpkm"
