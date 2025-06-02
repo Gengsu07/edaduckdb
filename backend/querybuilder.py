@@ -1,6 +1,6 @@
 from typing import Any, List, Union
 
-from connection import DatabaseManager
+from .connection import get_db_connection
 
 
 class QueryBuilder:
@@ -10,7 +10,7 @@ class QueryBuilder:
         self.params = []
         self.use_limit = use_limit
         self.custom_limit = None
-        self.DEFAULT_LIMIT = 100
+        self.DEFAULT_LIMIT = 200
 
     def set_custom_limit(self, limit: int):
         """Set a custom limit for the query"""
@@ -40,11 +40,12 @@ class QueryBuilder:
 
             # Multiple columns
             add_condition(
-                ["age", "status", "department"],
-                ["integer", "string", "string"],
-                [">", "=", "IN"],
-                [18, "active", ["IT", "HR"]]
+                ["age", "status", "department","date"],
+                ["integer", "string", "string","datetime"],
+                [">", "=", "IN", "BETWEEN"],
+                [18, "active", ["IT", "HR"],["2021-01-01", "2021-12-31"]]
             )
+
         """
         # Convert single inputs to lists for uniform processing
         if isinstance(column_names, str):
@@ -90,7 +91,9 @@ class QueryBuilder:
 
             elif col_type.lower() == "datetime":
                 if isinstance(value, (list, tuple)):
-                    self.conditions.append(f"{col_name} BETWEEN ? AND ?")
+                    self.conditions.append(
+                        f"{col_name}  BETWEEN CAST(? AS TIMESTAMP) AND CAST(? AS TIMESTAMP)"
+                    )
                     self.params.extend(value)
                 else:
                     self.conditions.append(f"{col_name} {operator} ?")
@@ -102,7 +105,7 @@ class QueryBuilder:
         """Add appropriate LIMIT clause to query based on settings"""
         if self.use_limit == "default":
             query += f" LIMIT {self.DEFAULT_LIMIT}"
-        elif self.use_limit == "custom" and self.custom_limit is not None:
+        if self.use_limit == "custom" and self.custom_limit is not None:
             query += f" LIMIT {self.custom_limit}"
         return query
 
@@ -130,25 +133,20 @@ class QueryBuilder:
         self.params = []
 
 
-def db_connection():
-    db_manager = DatabaseManager("config.toml")
-    conn = db_manager.connection
-    return conn
+if __name__ == "__main__":
+    builder = QueryBuilder("db.public.ppmpkm")
+    builder.add_condition(
+        column_names=["KDMAP", "DATEBAYAR", "KET"],
+        column_types=["string", "datetime", "string"],
+        operators=["IN", "", "="],
+        values=[["411125", "411126"], ["2024-01-01", "2024-12-15"], ["MPN", "SPM"]],
+    )
+    builder.set_custom_limit(10)
+    query, params = builder.build_select()
 
+    conn = get_db_connection()
 
-builder = QueryBuilder("db.public.ppmpkm")
-builder.add_condition(
-    column_names=["KDMAP", "TAHUNBAYAR", "KET"],
-    column_types=["string", "integer", "string"],
-    operators=["IN", "=", "="],
-    values=[["411125", "411126"], 2024, ["MPN", "SPM"]],
-)
-builder.set_custom_limit(10)
-query, params = builder.build_select()
-
-conn = db_connection()
-
-result = conn.execute(query, params).fetchall()
-print("\nMultiple conditions:")
-print(query, params)
-print(result)
+    result = conn.execute("""PRAGMA table_info('db.public.ppmpkm'); """).fetchall()
+    print("\nMultiple conditions:")
+    # print(query, params)
+    print(result)

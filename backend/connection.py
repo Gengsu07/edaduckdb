@@ -1,3 +1,5 @@
+from typing import Optional
+
 import duckdb
 import toml
 
@@ -19,10 +21,33 @@ class DBConnectionString:
 
 
 class DatabaseManager:
-    def __init__(self, config_file):
+    _instance: Optional["DatabaseManager"] = None
+    _connection = None
+
+    def __new__(cls, config_file=None):
+        if cls._instance is None:
+            cls._instance = super(DatabaseManager, cls).__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+
+    def __init__(self, config_file=None):
+        if self._initialized:
+            return
+
+        if config_file is None:
+            raise ValueError(
+                "config_file is required for initial DatabaseManager creation"
+            )
+
         self.config = self.load_config(config_file)
         self.db_config = DatabaseConfig(self.config)
-        self.connection = self.create_connection()
+        self._initialized = True
+
+    @property
+    def connection(self):
+        if self._connection is None:
+            self._connection = self.create_connection()
+        return self._connection
 
     @staticmethod
     def load_config(config_file):
@@ -62,6 +87,8 @@ class InitiateConnection:
         con = duckdb.connect()
         con.install_extension(f"{self.db_config.db_flavour}")
         con.load_extension(f"{self.db_config.db_flavour}")
+        con.install_extension("excel")
+        con.load_extension("excel")
 
         con.execute(
             f"ATTACH '{self.connection_attach}' as db (TYPE {self.db_config.db_flavour})"
@@ -70,15 +97,13 @@ class InitiateConnection:
         return con
 
 
-def db_connection():
-    db_manager = DatabaseManager("config.toml")
-    conn = db_manager.connection
-    return conn
+def get_db_connection():
+    return DatabaseManager("config.toml").connection
 
 
 # Now you can query directly
 
 if __name__ == "__main__":
-    conn = db_connection()
+    conn = get_db_connection()
     result = conn.sql("SELECT * FROM db.public.ppmpkm LIMIT 10;").fetchall()
     print(result)
